@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>R R Tiffen Center POS</title>
     
     <!-- Tailwind CSS -->
@@ -23,11 +23,22 @@
           margin: 0; 
         }
         
+        /* Prevent pull-to-refresh on mobile to feel more like an app */
+        body {
+            overscroll-behavior-y: contain;
+        }
+
         @media print {
           @page { margin: 0; size: auto; }
           body { background: white; }
           body > * { display: none !important; }
-          #root, .print\:w-full { display: block !important; width: 100% !important; height: auto !important; overflow: visible !important; }
+          /* Ensure root is visible and layout is reset for print */
+          #root { display: block !important; width: 100% !important; height: auto !important; overflow: visible !important; }
+          /* Force show the cart container in print even if hidden on mobile */
+          .cart-container { display: block !important; width: 100% !important; height: auto !important; position: static !important; }
+          /* Hide mobile navigation elements */
+          .mobile-nav { display: none !important; }
+          
           #receipt-area { width: 58mm; margin: 0 auto; padding: 5px; font-family: 'Courier New', monospace; color: black; }
           * { color: #000 !important; box-shadow: none !important; text-shadow: none !important; }
         }
@@ -46,7 +57,7 @@
             </svg>
         );
 
-        const Printer = (props) => <IconBase {...props}><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></IconBase>;
+        const Printer = (props) => <IconBase {...props}><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2-2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></IconBase>;
         const Trash2 = (props) => <IconBase {...props}><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></IconBase>;
         const Plus = (props) => <IconBase {...props}><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></IconBase>;
         const Minus = (props) => <IconBase {...props}><line x1="5" y1="12" x2="19" y2="12"></line></IconBase>;
@@ -60,6 +71,8 @@
         const PlusCircle = (props) => <IconBase {...props}><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></IconBase>;
         const RotateCcw = (props) => <IconBase {...props}><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></IconBase>;
         const Edit3 = (props) => <IconBase {...props}><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></IconBase>;
+        const ArrowLeft = (props) => <IconBase {...props}><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></IconBase>;
+        const ChevronRight = (props) => <IconBase {...props}><polyline points="9 18 15 12 9 6"></polyline></IconBase>;
 
         // --- Main Component ---
         const DsailePOS = () => {
@@ -111,6 +124,9 @@
           const [isManageMode, setIsManageMode] = useState(false);
           const [showCustomModal, setShowCustomModal] = useState(false);
           const [customItemForm, setCustomItemForm] = useState({ name: '', price: '', qty: 1 });
+          
+          // Mobile Layout State
+          const [showMobileCart, setShowMobileCart] = useState(false);
 
           // --- EFFECTS FOR AUTO-SAVE ---
 
@@ -126,6 +142,8 @@
 
           // Derived State
           const categories = [...new Set(items.map(item => item.category))];
+          const totalCartItems = cart.reduce((acc, item) => acc + item.qty, 0);
+          const totalAmount = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
 
           // --- Cart Actions ---
 
@@ -137,6 +155,10 @@
               }
               return [...prev, { ...item, qty: 1 }];
             });
+            // Optional: Provide haptic feedback if supported
+            if (window.navigator && window.navigator.vibrate) {
+                window.navigator.vibrate(50);
+            }
           };
 
           const updateCartItem = (id, field, value) => {
@@ -158,10 +180,9 @@
             }).filter(i => i.qty > 0));
           };
 
-          const clearCart = () => setCart([]);
-
-          const calculateTotal = () => {
-            return cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+          const clearCart = () => {
+            setCart([]);
+            setShowMobileCart(false); // Go back to menu on clear
           };
 
           const handlePrint = () => {
@@ -172,6 +193,7 @@
           const handleNewOrder = () => {
             setBillId(prev => prev + 1);
             setCart([]);
+            setShowMobileCart(false);
           };
 
           // --- Menu Management Actions ---
@@ -220,22 +242,23 @@
           });
 
           return (
-            <div className="flex h-screen bg-slate-100 font-sans overflow-hidden">
+            <div className="flex flex-col md:flex-row h-screen bg-slate-100 font-sans overflow-hidden">
               
               {/* LEFT SIDE: MENU & MANAGEMENT */}
-              <div className="flex-1 flex flex-col h-full print:hidden relative">
+              {/* On Mobile: Hidden if showMobileCart is true. On Desktop: Always flex. */}
+              <div className={`flex-1 flex flex-col h-full print:hidden relative transition-all duration-300 ${showMobileCart ? 'hidden md:flex' : 'flex'}`}>
                 {/* Header */}
-                <div className="bg-orange-600 text-white p-4 shadow-md flex justify-between items-center z-10">
-                  <h1 className="text-xl font-bold flex items-center gap-2">
+                <div className="bg-orange-600 text-white p-4 shadow-md flex justify-between items-center z-10 sticky top-0">
+                  <h1 className="text-lg md:text-xl font-bold flex items-center gap-2">
                     <Utensils className="h-6 w-6" />
-                    R R Tiffen Center
+                    <span className="truncate">R R Tiffen Center</span>
                   </h1>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     {!isManageMode && (
                       <input 
                         type="text" 
-                        placeholder="Search items..." 
-                        className="px-3 py-1 rounded text-gray-800 outline-none focus:ring-2 focus:ring-orange-300 w-48"
+                        placeholder="Search..." 
+                        className="px-3 py-1 rounded text-gray-800 outline-none focus:ring-2 focus:ring-orange-300 w-32 md:w-48 text-sm"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                       />
@@ -244,7 +267,7 @@
                       onClick={() => setIsManageMode(!isManageMode)}
                       className={`p-2 rounded-full transition-colors flex items-center gap-2 ${isManageMode ? 'bg-white text-orange-600 font-bold px-4' : 'bg-orange-700 hover:bg-orange-500 text-white'}`}
                     >
-                      {isManageMode ? <><Save size={20} /> Done Editing</> : <Settings size={20} />}
+                      {isManageMode ? <><Save size={18} /> <span className="hidden md:inline">Done</span></> : <Settings size={20} />}
                     </button>
                   </div>
                 </div>
@@ -252,71 +275,69 @@
                 {/* MAIN CONTENT AREA */}
                 {isManageMode ? (
                   // --- MANAGE MENU MODE ---
-                  <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+                  <div className="flex-1 overflow-y-auto p-4 bg-gray-50 pb-24">
                     <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
                       <div className="p-4 bg-gray-100 border-b flex justify-between items-center sticky top-0 z-20">
                         <div className="flex items-center gap-4">
                           <h2 className="font-bold text-gray-700 text-lg">Edit Menu</h2>
                           <button onClick={resetMenuToDefault} className="text-xs text-red-500 hover:underline flex items-center gap-1">
-                             <RotateCcw size={12} /> Reset to Defaults
+                             <RotateCcw size={12} /> Reset
                           </button>
                         </div>
-                        <button onClick={addNewMenuItem} className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 font-bold shadow-sm">
-                          <PlusCircle size={18} /> Add New Item
+                        <button onClick={addNewMenuItem} className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 font-bold shadow-sm text-sm">
+                          <PlusCircle size={16} /> Add
                         </button>
                       </div>
                       
                       <div className="p-0">
                         <table className="w-full text-left border-collapse">
-                          <thead className="bg-gray-50 text-gray-500 text-xs uppercase sticky top-[73px] z-10 shadow-sm">
+                          <thead className="bg-gray-50 text-gray-500 text-xs uppercase sticky top-[60px] z-10 shadow-sm">
                             <tr>
-                              <th className="p-3">Item Name</th>
-                              <th className="p-3">Category</th>
-                              <th className="p-3">Price (₹)</th>
-                              <th className="p-3 text-right">Delete</th>
+                              <th className="p-2 md:p-3">Item</th>
+                              <th className="p-2 md:p-3">Cat</th>
+                              <th className="p-2 md:p-3">₹</th>
+                              <th className="p-2 md:p-3 text-right">Del</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100">
                             {items.map((item, index) => (
                               <tr key={item.id} className="hover:bg-orange-50 transition-colors">
-                                <td className="p-3">
+                                <td className="p-2 md:p-3">
                                   <input 
                                     type="text" 
                                     value={item.name}
-                                    placeholder="Item Name"
+                                    placeholder="Name"
                                     onChange={(e) => handleItemChange(item.id, 'name', e.target.value)}
-                                    className="w-full border border-gray-300 rounded px-3 py-2 focus:border-orange-500 focus:ring-1 focus:ring-orange-200 outline-none"
-                                    autoFocus={item.name === ''}
+                                    className="w-full border border-gray-300 rounded px-2 py-2 focus:border-orange-500 outline-none text-sm"
                                   />
                                 </td>
-                                <td className="p-3">
+                                <td className="p-2 md:p-3">
                                   <input 
                                     type="text" 
                                     value={item.category}
-                                    placeholder="Category"
+                                    placeholder="Cat"
                                     onChange={(e) => handleItemChange(item.id, 'category', e.target.value)}
-                                    className="w-full border border-gray-300 rounded px-3 py-2 focus:border-orange-500 focus:ring-1 focus:ring-orange-200 outline-none"
+                                    className="w-full border border-gray-300 rounded px-2 py-2 focus:border-orange-500 outline-none text-sm"
                                     list="category-list"
                                   />
                                   <datalist id="category-list">
                                     {categories.map(c => <option key={c} value={c} />)}
                                   </datalist>
                                 </td>
-                                <td className="p-3">
+                                <td className="p-2 md:p-3">
                                   <input 
                                     type="number" 
                                     value={item.price}
                                     onChange={(e) => handleItemChange(item.id, 'price', parseFloat(e.target.value) || 0)}
-                                    className="w-24 border border-gray-300 rounded px-3 py-2 focus:border-orange-500 focus:ring-1 focus:ring-orange-200 outline-none font-mono"
+                                    className="w-16 border border-gray-300 rounded px-2 py-2 focus:border-orange-500 outline-none font-mono text-sm"
                                   />
                                 </td>
-                                <td className="p-3 text-right">
+                                <td className="p-2 md:p-3 text-right">
                                   <button 
                                     onClick={() => deleteMenuItem(item.id)} 
-                                    className="text-gray-400 hover:text-red-600 hover:bg-red-50 p-2 rounded-full transition-all"
-                                    title="Delete Item"
+                                    className="text-gray-400 hover:text-red-600 p-2"
                                   >
-                                    <Trash2 size={18} />
+                                    <Trash2 size={16} />
                                   </button>
                                 </td>
                               </tr>
@@ -324,7 +345,7 @@
                           </tbody>
                         </table>
                         <div className="p-8 text-center text-gray-400 text-sm">
-                          Changes are saved automatically.
+                          Changes saved automatically.
                         </div>
                       </div>
                     </div>
@@ -333,7 +354,7 @@
                   // --- POS MODE ---
                   <>
                     {/* Categories */}
-                    <div className="bg-white p-2 shadow-sm flex gap-2 overflow-x-auto">
+                    <div className="bg-white p-2 shadow-sm flex gap-2 overflow-x-auto sticky top-0 z-0">
                       <button 
                         onClick={() => setSelectedCategory('All')}
                         className={`px-4 py-2 rounded-full whitespace-nowrap text-sm font-medium transition-colors ${selectedCategory === 'All' ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
@@ -352,60 +373,73 @@
                     </div>
 
                     {/* Items Grid */}
-                    <div className="flex-1 overflow-y-auto p-4">
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    <div className="flex-1 overflow-y-auto p-4 pb-24 md:pb-4">
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
                         
                         {/* Custom Item Button */}
                         <button 
                           onClick={() => setShowCustomModal(true)}
-                          className="bg-gray-800 p-4 rounded-xl shadow-sm border border-transparent hover:shadow-md transition-all flex flex-col items-center justify-center h-32 group text-white"
+                          className="bg-gray-800 p-3 md:p-4 rounded-xl shadow-sm border border-transparent active:scale-95 transition-all flex flex-col items-center justify-center h-28 md:h-32 group text-white"
                         >
-                          <PlusCircle className="h-8 w-8 mb-2 text-orange-400" />
-                          <span className="font-bold">Custom Item</span>
+                          <PlusCircle className="h-6 w-6 md:h-8 md:w-8 mb-2 text-orange-400" />
+                          <span className="font-bold text-sm md:text-base">Custom</span>
                         </button>
 
                         {filteredMenu.map(item => (
                           <button 
                             key={item.id}
                             onClick={() => addToCart(item)}
-                            className="bg-white p-4 rounded-xl shadow-sm border border-transparent hover:border-orange-500 hover:shadow-md transition-all flex flex-col items-center justify-between h-32 group relative overflow-hidden"
+                            className="bg-white p-3 md:p-4 rounded-xl shadow-sm border border-transparent active:border-orange-500 active:bg-orange-50 md:hover:border-orange-500 md:hover:shadow-md transition-all flex flex-col items-center justify-between h-28 md:h-32 group relative overflow-hidden"
                           >
-                            <span className="font-bold text-gray-800 text-center leading-tight">{item.name || "Unnamed Item"}</span>
-                            <span className="text-orange-600 font-bold bg-orange-50 px-3 py-1 rounded-full group-hover:bg-orange-600 group-hover:text-white transition-colors">
+                            <span className="font-bold text-gray-800 text-center leading-tight text-sm md:text-base line-clamp-2">{item.name || "Unnamed"}</span>
+                            <span className="text-orange-600 font-bold bg-orange-50 px-2 py-1 md:px-3 rounded-full text-xs md:text-sm">
                               ₹{item.price}
                             </span>
                           </button>
                         ))}
                       </div>
                     </div>
+
+                    {/* MOBILE BOTTOM FLOATING BAR (Only visible on mobile when items in cart) */}
+                    {totalCartItems > 0 && (
+                        <div className="md:hidden fixed bottom-4 left-4 right-4 bg-green-600 text-white p-4 rounded-xl shadow-2xl flex justify-between items-center z-50 animate-bounce-slight" onClick={() => setShowMobileCart(true)}>
+                            <div className="flex flex-col">
+                                <span className="text-xs font-medium uppercase tracking-wider text-green-100">{totalCartItems} Items</span>
+                                <span className="text-xl font-bold">₹{totalAmount}</span>
+                            </div>
+                            <div className="flex items-center gap-2 font-bold">
+                                View Bill <ChevronRight size={20} />
+                            </div>
+                        </div>
+                    )}
                   </>
                 )}
 
                 {/* Custom Item Modal */}
                 {showCustomModal && (
-                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
                     <div className="bg-white rounded-lg p-6 w-full max-w-sm shadow-2xl animate-in fade-in zoom-in duration-200">
                       <div className="flex justify-between items-center mb-4">
                         <h3 className="text-lg font-bold">Add Custom Item</h3>
-                        <button onClick={() => setShowCustomModal(false)}><X size={20} /></button>
+                        <button onClick={() => setShowCustomModal(false)} className="p-2"><X size={20} /></button>
                       </div>
-                      <div className="space-y-3">
+                      <div className="space-y-4">
                         <input 
-                          type="text" placeholder="Item Name" className="w-full border p-2 rounded focus:border-orange-500 outline-none"
+                          type="text" placeholder="Item Name" className="w-full border p-3 rounded-lg focus:border-orange-500 outline-none bg-gray-50"
                           value={customItemForm.name} onChange={e => setCustomItemForm({...customItemForm, name: e.target.value})}
                           autoFocus
                         />
-                        <div className="flex gap-2">
+                        <div className="flex gap-3">
                           <input 
-                            type="number" placeholder="Price" className="w-1/2 border p-2 rounded focus:border-orange-500 outline-none"
+                            type="number" placeholder="Price" className="w-1/2 border p-3 rounded-lg focus:border-orange-500 outline-none bg-gray-50"
                             value={customItemForm.price} onChange={e => setCustomItemForm({...customItemForm, price: e.target.value})}
                           />
                           <input 
-                            type="number" placeholder="Qty" className="w-1/2 border p-2 rounded focus:border-orange-500 outline-none"
+                            type="number" placeholder="Qty" className="w-1/2 border p-3 rounded-lg focus:border-orange-500 outline-none bg-gray-50"
                             value={customItemForm.qty} onChange={e => setCustomItemForm({...customItemForm, qty: e.target.value})}
                           />
                         </div>
-                        <button onClick={addCustomItemToCart} className="w-full bg-orange-600 text-white py-2 rounded font-bold hover:bg-orange-700">Add to Bill</button>
+                        <button onClick={addCustomItemToCart} className="w-full bg-orange-600 text-white py-3 rounded-lg font-bold hover:bg-orange-700 active:scale-95 transition-transform">Add to Bill</button>
                       </div>
                     </div>
                   </div>
@@ -413,14 +447,21 @@
               </div>
 
               {/* RIGHT SIDE: CART / BILL */}
-              <div className="w-96 bg-white shadow-2xl flex flex-col border-l border-gray-200 h-full print:w-full print:border-none print:shadow-none">
+              {/* On Mobile: Hidden if !showMobileCart. On Desktop: Always flex (w-96). */}
+              <div className={`cart-container w-full md:w-96 bg-white shadow-2xl flex flex-col border-l border-gray-200 h-full transition-all duration-300 ${!showMobileCart ? 'hidden md:flex' : 'flex'}`}>
                 
-                {/* Cart Header (Hidden in Print) */}
+                {/* Cart Header */}
                 <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center print:hidden">
-                  <h2 className="font-bold text-gray-700 flex items-center gap-2">
-                    <ShoppingBag className="h-5 w-5" />
-                    Current Bill
-                  </h2>
+                  <div className="flex items-center gap-2">
+                     {/* Back Button for Mobile */}
+                     <button onClick={() => setShowMobileCart(false)} className="md:hidden p-2 -ml-2 text-gray-600 hover:bg-gray-200 rounded-full">
+                        <ArrowLeft size={20} />
+                     </button>
+                    <h2 className="font-bold text-gray-700 flex items-center gap-2">
+                        <ShoppingBag className="h-5 w-5" />
+                        Bill
+                    </h2>
+                  </div>
                   <span className="text-sm bg-blue-100 text-blue-800 px-2 py-0.5 rounded">#{billId}</span>
                 </div>
 
@@ -446,6 +487,9 @@
                       <div className="h-full flex flex-col items-center justify-center text-gray-400 print:hidden">
                         <Coffee className="h-12 w-12 mb-2 opacity-20" />
                         <p>Add items from menu</p>
+                        <button onClick={() => setShowMobileCart(false)} className="mt-4 md:hidden text-orange-600 font-medium border border-orange-200 px-4 py-2 rounded-full">
+                            Back to Menu
+                        </button>
                       </div>
                     )}
 
@@ -474,14 +518,14 @@
                           {/* Quantity & Total (Screen) */}
                           <div className="flex flex-col items-end gap-1 print:hidden">
                             <div className="flex items-center gap-2">
-                               <button onClick={() => updateQty(item.id, -1)} className="text-gray-400 hover:text-red-500"><Minus size={14} /></button>
+                               <button onClick={() => updateQty(item.id, -1)} className="text-gray-400 hover:text-red-500 p-1"><Minus size={16} /></button>
                                <input 
                                   type="number" 
                                   value={item.qty}
                                   onChange={(e) => updateCartItem(item.id, 'qty', parseInt(e.target.value) || 0)}
-                                  className="w-10 text-center text-sm font-bold border rounded bg-gray-50 focus:bg-white focus:ring-1 ring-orange-200 outline-none"
+                                  className="w-10 text-center text-sm font-bold border rounded bg-gray-50 focus:bg-white focus:ring-1 ring-orange-200 outline-none py-1"
                                />
-                               <button onClick={() => updateQty(item.id, 1)} className="text-gray-400 hover:text-green-500"><Plus size={14} /></button>
+                               <button onClick={() => updateQty(item.id, 1)} className="text-gray-400 hover:text-green-500 p-1"><Plus size={16} /></button>
                             </div>
                             <span className="font-bold text-gray-800 text-sm">₹{item.qty * item.price}</span>
                           </div>
@@ -499,7 +543,7 @@
                       <div className="border-t-2 border-dashed border-gray-300 my-2 print:border-gray-800"></div>
                       <div className="flex justify-between items-center text-lg font-bold print:font-mono">
                         <span>Total</span>
-                        <span>₹{calculateTotal()}</span>
+                        <span>₹{totalAmount}</span>
                       </div>
                       <div className="hidden print:block text-center mt-4">
                         <p className="text-xs font-mono">*** Thank You! ***</p>
@@ -510,17 +554,17 @@
                 </div>
 
                 {/* Action Buttons */}
-                <div className="p-4 border-t border-gray-200 bg-white print:hidden">
+                <div className="p-4 border-t border-gray-200 bg-white print:hidden pb-safe">
                   <div className="grid grid-cols-2 gap-3">
                     <button 
                       onClick={clearCart}
-                      className="flex items-center justify-center gap-2 px-4 py-3 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 font-medium"
+                      className="flex items-center justify-center gap-2 px-4 py-3 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 font-medium active:scale-95 transition-transform"
                     >
                       <Trash2 size={18} /> Cancel
                     </button>
                     <button 
                       onClick={handleNewOrder}
-                      className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 font-medium"
+                      className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 font-medium active:scale-95 transition-transform"
                     >
                       <RefreshCw size={18} /> New Bill
                     </button>
@@ -530,7 +574,7 @@
                     disabled={cart.length === 0}
                     className="w-full mt-3 bg-green-600 text-white py-4 rounded-lg font-bold text-lg shadow-lg hover:bg-green-700 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Printer size={24} /> Print Bill (₹{calculateTotal()})
+                    <Printer size={24} /> Print Bill (₹{totalAmount})
                   </button>
                 </div>
 
