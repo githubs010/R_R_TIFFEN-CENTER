@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>R R Tiffen Center POS</title>
+    <title>R R Tiffen Center POS (3x5 Print)</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -29,7 +29,9 @@
         }
 
         @media print {
-          @page { margin: 0; size: auto; }
+          /* --- KEY CHANGE: Set page size to 3x5 inch Index Card --- */
+          @page { margin: 0; size: 3in 5in; }
+          
           body { background: white; }
           body > * { display: none !important; }
           
@@ -38,7 +40,17 @@
           
           /* --- RECEIPT MODE --- */
           .print-mode-receipt .cart-container { display: block !important; width: 100% !important; height: auto !important; position: static !important; }
-          .print-mode-receipt #receipt-area { display: block !important; width: 58mm; margin: 0 auto; padding: 10px 5px; font-family: 'Courier New', monospace; color: black; }
+          
+          .print-mode-receipt #receipt-area { 
+            display: block !important; 
+            width: 100% !important; /* Fill the 3-inch width */
+            max-width: 3in;
+            margin: 0 auto; 
+            padding: 0.1in; /* Small padding */
+            font-family: 'Courier New', monospace; 
+            color: black; 
+            font-size: 12px; /* Slightly adjusted font size for 3x5 */
+          }
           .print-mode-receipt #report-area { display: none !important; }
 
           /* --- REPORT MODE --- */
@@ -52,7 +64,7 @@
             display: block !important; 
             width: 100% !important; 
             margin: 0; 
-            padding: 20px; 
+            padding: 10px; 
             font-family: sans-serif; 
             color: black; 
             position: absolute;
