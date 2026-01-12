@@ -30,9 +30,14 @@
 
         @media print {
           /* --- KEY CHANGE: Set page size to 3x5 inch Index Card --- */
+          /* Width: 3in, Height: 5in */
           @page { margin: 0; size: 3in 5in; }
           
-          body { background: white; }
+          body { 
+            background: white; 
+            margin: 0;
+            padding: 0;
+          }
           body > * { display: none !important; }
           
           /* Ensure root is visible */
@@ -43,13 +48,15 @@
           
           .print-mode-receipt #receipt-area { 
             display: block !important; 
-            width: 100% !important; /* Fill the 3-inch width */
+            /* Use slightly less than 3in to avoid edge clipping on some printers */
+            width: 2.8in !important; 
             max-width: 3in;
             margin: 0 auto; 
-            padding: 0.1in; /* Small padding */
+            padding: 0.1in 0; 
             font-family: 'Courier New', monospace; 
             color: black; 
-            font-size: 12px; /* Slightly adjusted font size for 3x5 */
+            font-size: 11px; /* Optimized for narrow paper */
+            line-height: 1.2;
           }
           .print-mode-receipt #report-area { display: none !important; }
 
@@ -62,9 +69,9 @@
           /* Show only the report area */
           .print-mode-report #report-area { 
             display: block !important; 
-            width: 100% !important; 
-            margin: 0; 
-            padding: 10px; 
+            width: 2.8in !important; /* Also restrict report width */
+            margin: 0 auto; 
+            padding: 10px 0; 
             font-family: sans-serif; 
             color: black; 
             position: absolute;
@@ -78,6 +85,9 @@
           /* General Print Resets */
           * { color: #000 !important; box-shadow: none !important; text-shadow: none !important; }
           .emoji-text { font-family: "Segoe UI Emoji", "Segoe UI Symbol", "Apple Color Emoji", "Noto Color Emoji", sans-serif; }
+          
+          /* Hide non-printable elements inside receipts */
+          .no-print { display: none !important; }
         }
     </style>
 </head>
